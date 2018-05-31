@@ -23,7 +23,8 @@ type Queryer interface {
 // TODO : REMOVE THIS INTO ITS OWN INDIVIDUAL PKG
 //light wrapper around auth kit package
 type AuthService struct {
-	DB Datastore
+	DB      Datastore
+	enabled bool
 }
 type Datastore interface {
 	Queryer
@@ -39,6 +40,9 @@ var ErrForbidden = errors.New("Action Forbidden")
 
 // IsAuthenticated is quick auth check. Returns true if user is logged in, else false
 func (as *AuthService) IsAuthenticated(ctx context.Context) bool {
+	if !as.enabled {
+		return true
+	}
 	return (_auth.ExtractUserFromContext(ctx) != nil)
 }
 
@@ -46,6 +50,9 @@ func (as *AuthService) IsAuthenticated(ctx context.Context) bool {
 // if user is not logged in, it will return ErrNotAuthenticated
 // if depository does not belong to user, it will return ErrForbidden
 func (as *AuthService) DepositoryAuthorization(ctx context.Context, depositoryID int64) error {
+	if !as.enabled {
+		return nil
+	}
 	if u := as.GetUser(ctx); u != nil {
 		if err := as.DB.UserDepositoryValidation(as.DB, u.UserId, depositoryID); err != nil {
 			return ErrForbidden
@@ -59,6 +66,9 @@ func (as *AuthService) DepositoryAuthorization(ctx context.Context, depositoryID
 // if user is not logged in, it will return ErrNotAuthenticated
 // if account does not belong to user, it will return ErrForbidden
 func (as *AuthService) AccountAuthorization(ctx context.Context, accountID int64) error {
+	if !as.enabled {
+		return nil
+	}
 	if u := as.GetUser(ctx); u != nil {
 		if err := as.DB.UserAccountValidation(as.DB, u.UserId, accountID); err != nil {
 			return ErrForbidden
@@ -73,8 +83,13 @@ func (as *AuthService) GetUser(ctx context.Context) *_auth.AspirationUser {
 	return _auth.ExtractUserFromContext(ctx)
 }
 
+func (as *AuthService) SetEnable(b bool) {
+	as.enabled = b
+}
+
 func NewAuthService(DB Datastore) *AuthService {
 	return &AuthService{
-		DB: DB,
+		DB:      DB,
+		enabled: true,
 	}
 }
